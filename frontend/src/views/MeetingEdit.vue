@@ -78,6 +78,10 @@
         </div>
       </div>
     </div>
+    <div v-else-if="loadError" class="error-state">
+      <p>{{ loadError }}</p>
+      <button class="btn-primary" @click="loadMeeting">重试</button>
+    </div>
     <div v-else class="loading-state">加载中...</div>
   </div>
 </template>
@@ -91,21 +95,27 @@ const route = useRoute()
 const meeting = ref(null)
 const items = ref([])
 const filterName = ref('')
+const loadError = ref('')
 
 onMounted(async () => {
   await loadMeeting()
 })
 
 async function loadMeeting() {
-  const { data } = await api.get(`/meetings/${route.params.id}/edit`)
-  meeting.value = data
-  items.value = data.action_items.map(item => ({
-    ...item,
-    checkpoints: item.checkpoints || [],
-    _saved: false,
-    _modified: false,
-    _saving: false,
-  }))
+  loadError.value = ''
+  try {
+    const { data } = await api.get(`/meetings/${route.params.id}/edit`)
+    meeting.value = data
+    items.value = data.action_items.map(item => ({
+      ...item,
+      checkpoints: item.checkpoints || [],
+      _saved: false,
+      _modified: false,
+      _saving: false,
+    }))
+  } catch (e) {
+    loadError.value = e.response?.data?.detail || '加载失败，请检查链接是否正确'
+  }
 }
 
 const assigneeList = computed(() => {

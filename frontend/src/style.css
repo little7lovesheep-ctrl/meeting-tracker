@@ -223,6 +223,8 @@ body {
 .member-field input, .member-field select { padding: 6px 10px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 13px; }
 .member-row { display: flex; gap: 12px; }
 .loading-state { text-align: center; padding: 40px; color: #999; }
+.error-state { text-align: center; padding: 40px; color: #ff4d4f; }
+.error-state button { margin-top: 12px; }
 
 /* Filter Bar */
 .filter-bar { background: #fff; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
