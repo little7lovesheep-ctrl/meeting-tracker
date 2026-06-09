@@ -42,9 +42,9 @@ async def parse_meeting_notes(raw_text: str, meeting_date: str) -> dict:
     if ANTHROPIC_BASE_URL:
         client_kwargs["base_url"] = ANTHROPIC_BASE_URL
 
-    client = anthropic.Anthropic(**client_kwargs)
+    client = anthropic.AsyncAnthropic(**client_kwargs)
 
-    message = client.messages.create(
+    message = await client.messages.create(
         model=ANTHROPIC_MODEL,
         max_tokens=4096,
         system=PARSE_SYSTEM_PROMPT,
@@ -64,4 +64,7 @@ async def parse_meeting_notes(raw_text: str, meeting_date: str) -> dict:
         else:
             response_text = response_text.split("```")[1].split("```")[0]
 
-    return json.loads(response_text.strip())
+    try:
+        return json.loads(response_text.strip())
+    except json.JSONDecodeError:
+        raise ValueError(f"AI返回内容无法解析为JSON，请重试")

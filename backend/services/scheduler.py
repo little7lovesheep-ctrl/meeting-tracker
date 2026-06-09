@@ -1,15 +1,24 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime, timedelta
+import logging
 import aiosqlite
 from config import DB_PATH
 from services.dingtalk import send_checkpoint_reminder, send_overdue_summary, send_to_channel
 
+logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
 
 
 async def send_today_checkpoints():
     """每天9:00 推送今日到期的check节点"""
+    try:
+        await _send_today_checkpoints()
+    except Exception as e:
+        logger.error(f"[scheduler] send_today_checkpoints failed: {e}")
+
+
+async def _send_today_checkpoints():
     today = datetime.now().date().isoformat()
     tomorrow = (datetime.now().date() + timedelta(days=1)).isoformat()
 
@@ -57,6 +66,13 @@ async def send_today_checkpoints():
 
 async def send_daily_overdue_summary():
     """每天9:30 推送逾期未完成项"""
+    try:
+        await _send_daily_overdue_summary()
+    except Exception as e:
+        logger.error(f"[scheduler] send_daily_overdue_summary failed: {e}")
+
+
+async def _send_daily_overdue_summary():
     today = datetime.now().date().isoformat()
 
     async with aiosqlite.connect(str(DB_PATH)) as db:
@@ -85,6 +101,13 @@ async def send_daily_overdue_summary():
 
 async def send_tomorrow_due_reminder():
     """每天17:00 推送明天到期的行动项提前提醒"""
+    try:
+        await _send_tomorrow_due_reminder()
+    except Exception as e:
+        logger.error(f"[scheduler] send_tomorrow_due_reminder failed: {e}")
+
+
+async def _send_tomorrow_due_reminder():
     tomorrow = (datetime.now().date() + timedelta(days=1)).isoformat()
     day_after = (datetime.now().date() + timedelta(days=2)).isoformat()
 

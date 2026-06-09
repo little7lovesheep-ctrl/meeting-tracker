@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     dingtalk_id TEXT,
     role TEXT DEFAULT 'member',
     password_hash TEXT,
+    sort_order INTEGER DEFAULT 99,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

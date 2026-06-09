@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import date, datetime
 
 
@@ -50,7 +50,7 @@ class ActionItemOut(BaseModel):
     due_date: Optional[str]
     created_at: Optional[str]
     completed_at: Optional[str]
-    checkpoints: list[CheckpointOut] = []
+    checkpoints: List[CheckpointOut] = []
 
 
 class ActionItemUpdate(BaseModel):

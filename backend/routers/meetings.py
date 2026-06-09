@@ -1,25 +1,20 @@
 from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import aiosqlite
 from database import get_db
 from services.ai_parser import parse_meeting_notes
 from services.dingtalk import send_to_channel
 
+import os
+
 router = APIRouter(prefix="/api/meetings", tags=["meetings"])
 
-FRONTEND_HOST = "http://192.168.1.235:5173"
+FRONTEND_HOST = os.getenv("FRONTEND_HOST", "http://localhost:5173")
 
 
 def get_frontend_url():
-    """优先用公网地址（cloudflare tunnel），否则用局域网地址"""
-    try:
-        url = open("/tmp/meeting-tracker-frontend-url.txt").read().strip()
-        if url:
-            return url
-    except FileNotFoundError:
-        pass
     return FRONTEND_HOST
 
 
@@ -39,7 +34,7 @@ class ActionItemData(BaseModel):
     assignee_name: Optional[str] = None
     priority: str = "medium"
     due_date: Optional[str] = None
-    checkpoints: list[CheckpointData] = []
+    checkpoints: List[CheckpointData] = []
 
 
 class DraftRequest(BaseModel):
@@ -47,7 +42,7 @@ class DraftRequest(BaseModel):
     meeting_date: Optional[date] = None
     title: str
     channel_name: str
-    action_items: list[ActionItemData]
+    action_items: List[ActionItemData]
 
 
 class ItemUpdateRequest(BaseModel):
@@ -56,7 +51,7 @@ class ItemUpdateRequest(BaseModel):
     assignee_name: Optional[str] = None
     priority: Optional[str] = None
     due_date: Optional[str] = None
-    checkpoints: Optional[list[CheckpointData]] = None
+    checkpoints: Optional[List[CheckpointData]] = None
 
 
 @router.get("")
@@ -89,6 +84,8 @@ async def upload_file(file: UploadFile = File(...)):
     """上传文件，提取文本内容返回。支持 txt/md/docx/pdf"""
     ext = file.filename.split(".")[-1].lower() if file.filename else ""
     content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="文件大小不能超过10MB")
 
     if ext in ("txt", "md"):
         try:
@@ -143,7 +140,7 @@ async def create_draft(req: DraftRequest, db: aiosqlite.Connection = Depends(get
 
         if assignee_name:
             ac = await db.execute(
-                "SELECT id FROM users WHERE name LIKE ?", (f"%{assignee_name}%",)
+                "SELECT id FROM users WHERE name = ?", (assignee_name,)
             )
             user_row = await ac.fetchone()
             if user_row:
