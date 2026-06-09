@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+
+# Database
+backend/data/*.db
+
+# Environment & Secrets
+backend/.env
+.env
+
+# Binary tools (download locally)
+ngrok
+cloudflared
+
+# Build output
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
