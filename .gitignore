@@ -10,6 +10,7 @@ backend/data/*.db
 # Environment & Secrets
 backend/.env
 .env
+backend/seed_data.json
 
 # Binary tools (download locally)
 ngrok

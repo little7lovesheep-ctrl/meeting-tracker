@@ -45,6 +45,19 @@ npm run dev
 ./start.sh
 ```
 
+## 初始化团队成员和钉钉群
+
+真实钉钉 webhook 不要提交到公开仓库。部署服务器上复制模板后填写本地配置：
+
+```bash
+cd backend
+cp seed_data.example.json seed_data.json
+# 编辑 seed_data.json，填入真实钉钉 webhook
+.venv/bin/python scripts/seed_initial_data.py --file seed_data.json
+```
+
+`backend/seed_data.json` 已在 `.gitignore` 中忽略，只保存在服务器本地。
+
 ## 功能
 
 - AI解析会议纪要（支持粘贴文本/上传 txt、md、docx、pdf）
