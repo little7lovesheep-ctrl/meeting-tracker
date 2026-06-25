@@ -7,6 +7,7 @@ export const useActionsStore = defineStore('actions', {
     loading: false,
   }),
   getters: {
+    followUpItems: (state) => state.items.filter(i => i.status !== 'done'),
     todoItems: (state) => state.items.filter(i => i.status === 'todo'),
     inProgressItems: (state) => state.items.filter(i => i.status === 'in_progress'),
     doneItems: (state) => state.items.filter(i => i.status === 'done'),

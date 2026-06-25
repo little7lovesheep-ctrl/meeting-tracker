@@ -1,7 +1,12 @@
 <template>
   <div class="kanban-page">
     <div class="kanban-header">
-      <h2>行动项看板</h2>
+      <div>
+        <h2>行动项追踪</h2>
+        <p class="kanban-summary">
+          待跟进 {{ store.followUpItems.length }} 项 · 已完成 {{ store.doneItems.length }} 项
+        </p>
+      </div>
       <select v-model="filterAssignee" @change="fetchData">
         <option value="">全部成员</option>
         <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
@@ -10,34 +15,16 @@
 
     <div class="kanban-board">
       <div class="kanban-column">
-        <div class="column-header todo">待办 ({{ store.todoItems.length }})</div>
+        <div class="column-header todo">待跟进 ({{ store.followUpItems.length }})</div>
         <div class="column-body">
-          <div v-for="item in store.todoItems" :key="item.id" class="kanban-card"
+          <div v-for="item in store.followUpItems" :key="item.id" class="kanban-card"
                @click="goDetail(item.id)">
             <div class="card-priority" :class="item.priority"></div>
             <div class="card-content">
               <div class="card-title">{{ item.title }}</div>
               <div class="card-meta">
                 <span class="assignee">{{ item.assignee_name || '未分配' }}</span>
-                <span class="due" :class="{ overdue: isOverdue(item) }">
-                  {{ item.due_date || '无截止' }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="kanban-column">
-        <div class="column-header progress">进行中 ({{ store.inProgressItems.length }})</div>
-        <div class="column-body">
-          <div v-for="item in store.inProgressItems" :key="item.id" class="kanban-card"
-               @click="goDetail(item.id)">
-            <div class="card-priority" :class="item.priority"></div>
-            <div class="card-content">
-              <div class="card-title">{{ item.title }}</div>
-              <div class="card-meta">
-                <span class="assignee">{{ item.assignee_name || '未分配' }}</span>
+                <span v-if="item.status === 'in_progress'" class="status-chip">已反馈</span>
                 <span class="due" :class="{ overdue: isOverdue(item) }">
                   {{ item.due_date || '无截止' }}
                 </span>

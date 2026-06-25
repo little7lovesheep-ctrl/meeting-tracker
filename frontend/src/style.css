@@ -114,8 +114,9 @@ body {
 /* Kanban Board */
 .kanban-page { width: 100%; }
 .kanban-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.kanban-summary { margin-top: 4px; color: #666; font-size: 13px; }
 .kanban-header select { padding: 6px 12px; border: 1px solid #d9d9d9; border-radius: 6px; }
-.kanban-board { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; min-height: 60vh; }
+.kanban-board { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; min-height: 60vh; }
 .kanban-column { background: #f0f2f5; border-radius: 8px; padding: 12px; }
 .column-header { padding: 8px 12px; font-weight: 600; font-size: 14px; border-radius: 6px; margin-bottom: 12px; }
 .column-header.todo { background: #e6f7ff; color: #1890ff; }
@@ -135,6 +136,7 @@ body {
 .kanban-card .card-title { font-size: 13px; font-weight: 500; margin-bottom: 6px; }
 .kanban-card .card-meta { display: flex; justify-content: space-between; font-size: 12px; color: #999; }
 .kanban-card .assignee { color: #666; }
+.kanban-card .status-chip { color: #1890ff; background: #e6f7ff; padding: 0 6px; border-radius: 999px; }
 .kanban-card .due.overdue { color: #ff4d4f; font-weight: 500; }
 .done-card { opacity: 0.7; }
 
