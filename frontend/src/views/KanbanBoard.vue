@@ -29,6 +29,11 @@
                   {{ item.due_date || '无截止' }}
                 </span>
               </div>
+              <div class="card-actions">
+                <button class="btn-mark-done" @click.stop="markDone(item.id)">
+                  标记已完成
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -82,5 +87,9 @@ function isOverdue(item) {
 
 function goDetail(id) {
   router.push(`/actions/${id}`)
+}
+
+async function markDone(id) {
+  await store.updateStatus(id, 'done')
 }
 </script>

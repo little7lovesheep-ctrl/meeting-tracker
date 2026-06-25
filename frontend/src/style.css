@@ -138,6 +138,17 @@ body {
 .kanban-card .assignee { color: #666; }
 .kanban-card .status-chip { color: #1890ff; background: #e6f7ff; padding: 0 6px; border-radius: 999px; }
 .kanban-card .due.overdue { color: #ff4d4f; font-weight: 500; }
+.kanban-card .card-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+.btn-mark-done {
+  border: 1px solid #52c41a;
+  background: #f6ffed;
+  color: #389e0d;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn-mark-done:hover { background: #d9f7be; }
 .done-card { opacity: 0.7; }
 
 /* Dashboard */
