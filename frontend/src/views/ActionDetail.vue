@@ -5,6 +5,7 @@
       <h2>{{ action.title }}</h2>
       <div class="detail-meta">
         <span class="assignee">责任人: {{ action.assignee_name || '未分配' }}</span>
+        <span v-if="action.watcher_name" class="watcher">关注人: {{ action.watcher_name }}</span>
         <span class="status-tag" :class="action.status">{{ statusLabel }}</span>
         <span class="priority-tag" :class="action.priority">{{ action.priority }}</span>
         <span v-if="action.due_date">截止: {{ action.due_date }}</span>

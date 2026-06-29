@@ -12,6 +12,7 @@ PARSE_SYSTEM_PROMPT = """你是一个会议纪要解析助手。从会议纪要�
       "title": "行动项简述（一句话）",
       "description": "详细描述（如有补充信息）",
       "assignee_name": "责任人姓名",
+      "watcher_name": "关注人/Check人姓名，无法判断则为空字符串",
       "due_date": "YYYY-MM-DD 或 null",
       "priority": "high/medium/low",
       "checkpoints": [
@@ -26,6 +27,7 @@ PARSE_SYSTEM_PROMPT = """你是一个会议纪要解析助手。从会议纪要�
 
 规则：
 1. 责任人提取原始姓名，保持会议中的称呼
+1.1 关注人/Check人是负责盯结果和检查节点的人；如果会议未明确，不要臆测，设为空字符串
 2. 截止时间：如"本周""两周内"根据会议日期推算具体日期；无明确时间设为会议后7天
 3. check节点：中间汇报点、确认点、阶段性验收点都提取为checkpoint
 4. 如果一个大任务有多个子步骤但同一个责任人，拆分为多个action_item

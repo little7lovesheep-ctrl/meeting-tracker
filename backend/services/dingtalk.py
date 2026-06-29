@@ -38,9 +38,12 @@ async def send_to_channel(channel_name: str, title: str, text: str, at_user_ids:
         }
     }
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(channel["webhook_url"], json=msg)
-        print(f"[钉钉] 推送到 '{channel_name}': {resp.status_code}")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(channel["webhook_url"], json=msg)
+            print(f"[钉钉] 推送到 '{channel_name}': {resp.status_code} {resp.text}")
+    except httpx.HTTPError as exc:
+        print(f"[钉钉] 推送到 '{channel_name}' 失败，已跳过: {exc}")
 
 
 async def send_to_all_channels(title: str, text: str, at_user_ids: Optional[List[str]] = None):

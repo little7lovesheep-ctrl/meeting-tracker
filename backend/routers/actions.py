@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 import aiosqlite
 from database import get_db
@@ -11,24 +11,52 @@ router = APIRouter(prefix="/api/actions", tags=["actions"])
 async def list_actions(
     status: str = Query(None),
     assignee_id: int = Query(None),
+    watcher_name: str = Query(None),
+    focus_owner: str = Query(None),
     overdue: bool = Query(False),
     db: aiosqlite.Connection = Depends(get_db)
 ):
-    query = "SELECT * FROM action_items WHERE 1=1"
+    query = """
+        SELECT ai.*
+        FROM action_items ai
+        LEFT JOIN meetings m ON ai.meeting_id = m.id
+        WHERE (ai.meeting_id IS NULL OR m.status = 'active')
+    """
     params = []
 
     if status:
-        query += " AND status = ?"
+        query += " AND ai.status = ?"
         params.append(status)
     if assignee_id:
-        query += " AND assignee_id = ?"
+        query += " AND ai.assignee_id = ?"
         params.append(assignee_id)
+    if watcher_name:
+        query += " AND ai.watcher_name = ?"
+        params.append(watcher_name)
     if overdue:
         today = datetime.now().date().isoformat()
-        query += " AND due_date < ? AND status != 'done'"
+        query += " AND ai.due_date < ? AND ai.status != 'done'"
         params.append(today)
+    if focus_owner:
+        today = datetime.now().date()
+        upcoming = (today + timedelta(days=1)).isoformat()
+        query += """
+            AND ai.status != 'done'
+            AND (
+                ai.watcher_name = ?
+                OR ai.priority = 'high'
+                OR (ai.due_date IS NOT NULL AND ai.due_date < ?)
+                OR EXISTS (
+                    SELECT 1 FROM checkpoints cp
+                    WHERE cp.action_item_id = ai.id
+                      AND date(cp.check_date) <= date(?)
+                      AND cp.notified = 0
+                )
+            )
+        """
+        params.extend([focus_owner, today.isoformat(), upcoming])
 
-    query += " ORDER BY CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, due_date"
+    query += " ORDER BY CASE ai.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, ai.due_date"
     cursor = await db.execute(query, params)
     items = await cursor.fetchall()
 
@@ -39,18 +67,51 @@ async def list_actions(
             "SELECT * FROM checkpoints WHERE action_item_id = ?", (item["id"],)
         )
         item_dict["checkpoints"] = [dict(cp) for cp in await cp_cursor.fetchall()]
+        item_dict["focus_reasons"] = get_focus_reasons(item_dict)
         result.append(item_dict)
 
     return result
+
+
+def get_focus_reasons(item: dict) -> list[str]:
+    today = datetime.now().date()
+    reasons = []
+    if item.get("watcher_name"):
+        reasons.append(f"{item['watcher_name']}关注")
+    if item.get("priority") == "high":
+        reasons.append("高优先级")
+    due_date = item.get("due_date")
+    if due_date:
+        try:
+            if datetime.fromisoformat(due_date).date() < today and item.get("status") != "done":
+                reasons.append("已逾期")
+        except ValueError:
+            pass
+    upcoming = today + timedelta(days=1)
+    for checkpoint in item.get("checkpoints", []):
+        check_date = checkpoint.get("check_date")
+        if not check_date or checkpoint.get("notified"):
+            continue
+        try:
+            if datetime.fromisoformat(check_date).date() <= upcoming:
+                reasons.append("检查节点将至")
+                break
+        except ValueError:
+            continue
+    return reasons
 
 
 @router.get("/overdue")
 async def list_overdue(db: aiosqlite.Connection = Depends(get_db)):
     today = datetime.now().date().isoformat()
     cursor = await db.execute(
-        """SELECT * FROM action_items
-           WHERE due_date < ? AND status NOT IN ('done')
-           ORDER BY due_date""",
+        """SELECT ai.*
+           FROM action_items ai
+           LEFT JOIN meetings m ON ai.meeting_id = m.id
+           WHERE ai.due_date < ?
+             AND ai.status NOT IN ('done')
+             AND (ai.meeting_id IS NULL OR m.status = 'active')
+           ORDER BY ai.due_date""",
         (today,)
     )
     rows = await cursor.fetchall()
@@ -61,21 +122,24 @@ async def list_overdue(db: aiosqlite.Connection = Depends(get_db)):
 async def dashboard(db: aiosqlite.Connection = Depends(get_db)):
     today = datetime.now().date().isoformat()
 
-    total = await (await db.execute("SELECT COUNT(*) as c FROM action_items")).fetchone()
-    done = await (await db.execute("SELECT COUNT(*) as c FROM action_items WHERE status='done'")).fetchone()
+    active_filter = "FROM action_items ai LEFT JOIN meetings m ON ai.meeting_id = m.id WHERE (ai.meeting_id IS NULL OR m.status = 'active')"
+    total = await (await db.execute(f"SELECT COUNT(*) as c {active_filter}")).fetchone()
+    done = await (await db.execute(f"SELECT COUNT(*) as c {active_filter} AND ai.status='done'")).fetchone()
     overdue = await (await db.execute(
-        "SELECT COUNT(*) as c FROM action_items WHERE due_date < ? AND status != 'done'", (today,)
+        f"SELECT COUNT(*) as c {active_filter} AND ai.due_date < ? AND ai.status != 'done'", (today,)
     )).fetchone()
     in_progress = await (await db.execute(
-        "SELECT COUNT(*) as c FROM action_items WHERE status='in_progress'"
+        f"SELECT COUNT(*) as c {active_filter} AND ai.status='in_progress'"
     )).fetchone()
 
     assignee_cursor = await db.execute(
-        """SELECT assignee_name, COUNT(*) as count,
-                  SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) as done_count
-           FROM action_items
-           WHERE assignee_name IS NOT NULL
-           GROUP BY assignee_name"""
+        """SELECT ai.assignee_name, COUNT(*) as count,
+                  SUM(CASE WHEN ai.status='done' THEN 1 ELSE 0 END) as done_count
+           FROM action_items ai
+           LEFT JOIN meetings m ON ai.meeting_id = m.id
+           WHERE ai.assignee_name IS NOT NULL
+             AND (ai.meeting_id IS NULL OR m.status = 'active')
+           GROUP BY ai.assignee_name"""
     )
     by_assignee = [dict(row) for row in await assignee_cursor.fetchall()]
 

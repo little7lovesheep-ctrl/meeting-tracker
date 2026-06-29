@@ -1,21 +1,30 @@
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
+import os
+from pathlib import Path
+import tempfile
+
+import config
+import database
+
+TEST_DB_PATH = Path(tempfile.gettempdir()) / "meeting_tracker_test.db"
+config.DB_PATH = TEST_DB_PATH
+database.DB_PATH = TEST_DB_PATH
+
 from main import app
 from database import init_db
-from config import DB_PATH
-import os
 
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_db():
     """每个测试用新数据库"""
-    if DB_PATH.exists():
-        DB_PATH.unlink()
+    if database.DB_PATH.exists():
+        database.DB_PATH.unlink()
     await init_db()
     yield
-    if DB_PATH.exists():
-        DB_PATH.unlink()
+    if database.DB_PATH.exists():
+        database.DB_PATH.unlink()
 
 
 @pytest_asyncio.fixture
@@ -107,7 +116,7 @@ async def test_create_draft(seeded_client):
         "title": "测试会议",
         "channel_name": "测试群",
         "action_items": [
-            {"title": "任务1", "assignee_name": "吕彦", "priority": "high", "due_date": "2026-06-15", "checkpoints": [
+            {"title": "任务1", "assignee_name": "吕彦", "watcher_name": "文静", "priority": "high", "due_date": "2026-06-15", "checkpoints": [
                 {"check_date": "2026-06-12", "description": "中期检查"}
             ]},
             {"title": "任务2", "assignee_name": "青哥", "priority": "medium", "due_date": "2026-06-20", "checkpoints": []}
@@ -118,6 +127,7 @@ async def test_create_draft(seeded_client):
     assert data["status"] == "draft"
     assert len(data["action_items"]) == 2
     assert data["action_items"][0]["assignee_id"] == 2  # 吕彦的ID
+    assert data["action_items"][0]["watcher_name"] == "文静"
 
 
 @pytest.mark.asyncio
@@ -131,7 +141,21 @@ async def test_draft_meeting_not_in_active_list(seeded_client):
     })
     resp = await seeded_client.get("/api/actions")
     assert resp.status_code == 200
-    # 看板应该返回所有action items（不区分meeting status），由前端筛选
+    assert len(resp.json()) == 0
+
+
+@pytest.mark.asyncio
+async def test_active_meeting_in_action_list(seeded_client):
+    draft_resp = await seeded_client.post("/api/meetings/draft", json={
+        "raw_text": "x", "meeting_date": "2026-06-09", "title": "生效会议",
+        "channel_name": "测试群", "action_items": [
+            {"title": "生效任务", "assignee_name": "吕彦", "priority": "medium", "due_date": "2026-06-15", "checkpoints": []}
+        ]
+    })
+    meeting_id = draft_resp.json()["meeting_id"]
+    await seeded_client.put(f"/api/meetings/{meeting_id}/activate")
+    resp = await seeded_client.get("/api/actions")
+    assert resp.status_code == 200
     assert len(resp.json()) == 1
 
 
@@ -179,6 +203,7 @@ async def test_update_action_item(seeded_client):
 
     resp = await seeded_client.put(f"/api/meetings/{meeting_id}/items/{item_id}", json={
         "due_date": "2026-06-18",
+        "watcher_name": "文静",
         "checkpoints": [
             {"check_date": "2026-06-14", "description": "新检查点"},
             {"check_date": "2026-06-16", "description": "二次检查"}
@@ -190,8 +215,31 @@ async def test_update_action_item(seeded_client):
     edit_resp = await seeded_client.get(f"/api/meetings/{meeting_id}/edit")
     item = edit_resp.json()["action_items"][0]
     assert item["due_date"] == "2026-06-18"
+    assert item["watcher_name"] == "文静"
     assert len(item["checkpoints"]) == 2
     assert item["confirmed"] == 1  # 修改保存即确认
+
+
+@pytest.mark.asyncio
+async def test_update_action_item_assignee_syncs_assignee_id(seeded_client):
+    draft_resp = await seeded_client.post("/api/meetings/draft", json={
+        "raw_text": "x", "meeting_date": "2026-06-09", "title": "会议",
+        "channel_name": "测试群", "action_items": [
+            {"title": "任务", "assignee_name": "吕彦", "priority": "medium", "due_date": "2026-06-15", "checkpoints": []}
+        ]
+    })
+    meeting_id = draft_resp.json()["meeting_id"]
+    item_id = draft_resp.json()["action_items"][0]["id"]
+
+    resp = await seeded_client.put(f"/api/meetings/{meeting_id}/items/{item_id}", json={
+        "assignee_name": "青哥"
+    })
+    assert resp.status_code == 200
+
+    edit_resp = await seeded_client.get(f"/api/meetings/{meeting_id}/edit")
+    item = edit_resp.json()["action_items"][0]
+    assert item["assignee_name"] == "青哥"
+    assert item["assignee_id"] == 3
 
 
 @pytest.mark.asyncio
@@ -266,6 +314,8 @@ async def test_feedback_100_marks_done(seeded_client):
         ]
     })
     item_id = draft_resp.json()["action_items"][0]["id"]
+    meeting_id = draft_resp.json()["meeting_id"]
+    await seeded_client.put(f"/api/meetings/{meeting_id}/activate")
 
     await seeded_client.post(f"/api/actions/{item_id}/feedback", json={"content": "全部完成", "progress": 100})
 
@@ -278,18 +328,38 @@ async def test_feedback_100_marks_done(seeded_client):
 
 @pytest.mark.asyncio
 async def test_dashboard(seeded_client):
-    await seeded_client.post("/api/meetings/draft", json={
+    draft_resp = await seeded_client.post("/api/meetings/draft", json={
         "raw_text": "x", "meeting_date": "2026-06-09", "title": "会议",
         "channel_name": "测试群", "action_items": [
             {"title": "任务1", "assignee_name": "吕彦", "priority": "high", "due_date": "2026-06-15", "checkpoints": []},
             {"title": "任务2", "assignee_name": "青哥", "priority": "medium", "due_date": "2026-06-20", "checkpoints": []}
         ]
     })
+    await seeded_client.put(f"/api/meetings/{draft_resp.json()['meeting_id']}/activate")
     resp = await seeded_client.get("/api/actions/dashboard")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] == 2
     assert data["done"] == 0
+
+
+@pytest.mark.asyncio
+async def test_focus_owner_filter(seeded_client):
+    draft_resp = await seeded_client.post("/api/meetings/draft", json={
+        "raw_text": "x", "meeting_date": "2026-06-09", "title": "会议",
+        "channel_name": "测试群", "action_items": [
+            {"title": "文静关注任务", "assignee_name": "吕彦", "watcher_name": "文静", "priority": "medium", "due_date": "2026-07-10", "checkpoints": []},
+            {"title": "高优任务", "assignee_name": "青哥", "priority": "high", "due_date": "2026-07-10", "checkpoints": []},
+            {"title": "普通任务", "assignee_name": "青哥", "priority": "low", "due_date": "2026-07-10", "checkpoints": []}
+        ]
+    })
+    await seeded_client.put(f"/api/meetings/{draft_resp.json()['meeting_id']}/activate")
+    resp = await seeded_client.get("/api/actions", params={"focus_owner": "文静"})
+    assert resp.status_code == 200
+    titles = [item["title"] for item in resp.json()]
+    assert "文静关注任务" in titles
+    assert "高优任务" in titles
+    assert "普通任务" not in titles
 
 
 # === 文件上传 ===

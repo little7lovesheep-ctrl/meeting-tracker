@@ -15,6 +15,7 @@
         <div v-for="item in items" :key="item.id" class="review-card">
           <div class="review-card-header">
             <span class="assignee-badge">{{ item.assignee_name || '未分配' }}</span>
+            <span class="watcher-badge" v-if="item.watcher_name">关注: {{ item.watcher_name }}</span>
             <span class="priority-tag" :class="item.priority">{{ priorityLabel(item.priority) }}</span>
           </div>
           <div class="review-title">{{ item.title }}</div>

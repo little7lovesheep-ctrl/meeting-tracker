@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS action_items (
     description TEXT,
     assignee_id INTEGER REFERENCES users(id),
     assignee_name TEXT,
+    watcher_name TEXT,
     status TEXT DEFAULT 'todo',
     priority TEXT DEFAULT 'medium',
     due_date DATE,
@@ -83,4 +84,13 @@ async def get_db():
 async def init_db():
     async with aiosqlite.connect(str(DB_PATH)) as db:
         await db.executescript(SCHEMA)
+        await migrate_db(db)
         await db.commit()
+
+
+async def migrate_db(db: aiosqlite.Connection):
+    """轻量迁移：兼容已部署的旧 SQLite 数据库。"""
+    cursor = await db.execute("PRAGMA table_info(action_items)")
+    columns = {row[1] for row in await cursor.fetchall()}
+    if "watcher_name" not in columns:
+        await db.execute("ALTER TABLE action_items ADD COLUMN watcher_name TEXT")

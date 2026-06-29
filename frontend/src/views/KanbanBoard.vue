@@ -4,13 +4,18 @@
       <div>
         <h2>行动项追踪</h2>
         <p class="kanban-summary">
-          待跟进 {{ store.followUpItems.length }} 项 · 已完成 {{ store.doneItems.length }} 项
+          {{ focusMode ? '文静重点关注' : '全部已生效事项' }} · 待跟进 {{ store.followUpItems.length }} 项 · 已完成 {{ store.doneItems.length }} 项
         </p>
       </div>
-      <select v-model="filterAssignee" @change="fetchData">
-        <option value="">全部成员</option>
-        <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
-      </select>
+      <div class="kanban-tools">
+        <button class="focus-toggle" :class="{ active: focusMode }" @click="toggleFocus">
+          {{ focusMode ? '查看全部事项' : '文静重点关注' }}
+        </button>
+        <select v-model="filterAssignee" @change="fetchData" :disabled="focusMode">
+          <option value="">全部成员</option>
+          <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
+        </select>
+      </div>
     </div>
 
     <div class="kanban-board">
@@ -24,10 +29,14 @@
               <div class="card-title">{{ item.title }}</div>
               <div class="card-meta">
                 <span class="assignee">{{ item.assignee_name || '未分配' }}</span>
+                <span v-if="item.watcher_name" class="watcher-chip">关注: {{ item.watcher_name }}</span>
                 <span v-if="item.status === 'in_progress'" class="status-chip">已反馈</span>
                 <span class="due" :class="{ overdue: isOverdue(item) }">
                   {{ item.due_date || '无截止' }}
                 </span>
+              </div>
+              <div class="focus-reasons" v-if="item.focus_reasons?.length">
+                <span v-for="reason in item.focus_reasons" :key="reason">{{ reason }}</span>
               </div>
               <div class="card-actions">
                 <button class="btn-mark-done" @click.stop="markDone(item.id)">
@@ -67,6 +76,7 @@ const store = useActionsStore()
 const router = useRouter()
 const users = ref([])
 const filterAssignee = ref('')
+const focusMode = ref(false)
 
 onMounted(async () => {
   await fetchData()
@@ -76,8 +86,18 @@ onMounted(async () => {
 
 async function fetchData() {
   const params = {}
-  if (filterAssignee.value) params.assignee_id = filterAssignee.value
+  if (focusMode.value) {
+    params.focus_owner = '文静'
+  } else if (filterAssignee.value) {
+    params.assignee_id = filterAssignee.value
+  }
   await store.fetchAll(params)
+}
+
+async function toggleFocus() {
+  focusMode.value = !focusMode.value
+  if (focusMode.value) filterAssignee.value = ''
+  await fetchData()
 }
 
 function isOverdue(item) {

@@ -32,6 +32,7 @@ class ActionItemData(BaseModel):
     title: str
     description: Optional[str] = None
     assignee_name: Optional[str] = None
+    watcher_name: Optional[str] = None
     priority: str = "medium"
     due_date: Optional[str] = None
     checkpoints: List[CheckpointData] = []
@@ -49,6 +50,7 @@ class ItemUpdateRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     assignee_name: Optional[str] = None
+    watcher_name: Optional[str] = None
     priority: Optional[str] = None
     due_date: Optional[str] = None
     checkpoints: Optional[List[CheckpointData]] = None
@@ -148,10 +150,10 @@ async def create_draft(req: DraftRequest, db: aiosqlite.Connection = Depends(get
 
         ai_cursor = await db.execute(
             """INSERT INTO action_items
-               (meeting_id, title, description, assignee_id, assignee_name, status, priority, due_date, channel_name)
-               VALUES (?, ?, ?, ?, ?, 'todo', ?, ?, ?)""",
+               (meeting_id, title, description, assignee_id, assignee_name, watcher_name, status, priority, due_date, channel_name)
+               VALUES (?, ?, ?, ?, ?, ?, 'todo', ?, ?, ?)""",
             (meeting_id, item.title, item.description,
-             assignee_id, assignee_name, item.priority,
+             assignee_id, assignee_name, item.watcher_name or "", item.priority,
              item.due_date, req.channel_name)
         )
         action_item_id = ai_cursor.lastrowid
@@ -167,6 +169,7 @@ async def create_draft(req: DraftRequest, db: aiosqlite.Connection = Depends(get
             "title": item.title,
             "assignee_name": assignee_name,
             "assignee_id": assignee_id,
+            "watcher_name": item.watcher_name or "",
             "priority": item.priority,
             "due_date": item.due_date,
             "checkpoints": [{"check_date": cp.check_date, "description": cp.description} for cp in item.checkpoints]
@@ -195,7 +198,7 @@ async def _send_draft_to_dingtalk(title: str, meeting_date: str, items: list, me
 
     priority_label = {"high": "高优", "medium": "中优", "low": "低优"}
 
-    lines = [f"### 会议行动项确认\n"]
+    lines = [f"### 会议纪要行动项确认\n"]
     lines.append(f"**会议**: {title}（{meeting_date}）\n")
     lines.append("---\n")
 
@@ -204,7 +207,8 @@ async def _send_draft_to_dingtalk(title: str, meeting_date: str, items: list, me
         for i, item in enumerate(assignee_items, 1):
             p = priority_label.get(item["priority"], "中优")
             due = item["due_date"] or "待定"
-            lines.append(f"{i}. {item['title']} | 截止: {due} | {p}\n")
+            watcher = f" | 关注: {item['watcher_name']}" if item.get("watcher_name") else ""
+            lines.append(f"{i}. {item['title']} | 截止: {due} | {p}{watcher}\n")
         lines.append("")
 
     lines.append("---\n")
@@ -212,7 +216,7 @@ async def _send_draft_to_dingtalk(title: str, meeting_date: str, items: list, me
     lines.append(f"请各位确认自己的行动项和截止时间，如需调整请点击：\n\n[查看并修改]({edit_url})")
 
     text = "\n".join(lines)
-    await send_to_channel(channel_name, "会议行动项确认", text)
+    await send_to_channel(channel_name, "会议纪要行动项确认", text)
 
 
 @router.put("/{meeting_id}/activate")
@@ -273,11 +277,25 @@ async def update_action_item(meeting_id: int, item_id: int, req: ItemUpdateReque
     # 更新基础字段
     updates = []
     params = []
-    for field in ["title", "description", "assignee_name", "priority", "due_date"]:
+    for field in ["title", "description", "watcher_name", "priority", "due_date"]:
         value = getattr(req, field)
         if value is not None:
             updates.append(f"{field} = ?")
             params.append(value)
+
+    if req.assignee_name is not None:
+        assignee_id = None
+        if req.assignee_name:
+            ac = await db.execute(
+                "SELECT id FROM users WHERE name = ?", (req.assignee_name,)
+            )
+            user_row = await ac.fetchone()
+            if user_row:
+                assignee_id = user_row["id"]
+        updates.append("assignee_name = ?")
+        params.append(req.assignee_name)
+        updates.append("assignee_id = ?")
+        params.append(assignee_id)
 
     if updates:
         params.append(item_id)

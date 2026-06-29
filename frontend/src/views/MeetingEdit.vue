@@ -29,6 +29,7 @@
         <div v-for="item in filteredItems" :key="item.id" class="member-edit-card" :class="{ 'card-modified': item._modified }">
           <div class="member-card-header">
             <span class="assignee-badge">{{ item.assignee_name || '未分配' }}</span>
+            <span class="watcher-badge" v-if="item.watcher_name">关注: {{ item.watcher_name }}</span>
             <span class="priority-tag" :class="item.priority">{{ priorityLabel(item.priority) }}</span>
             <span class="save-status saved" v-if="item._saved">已保存 ✓</span>
             <span class="save-status modified" v-else-if="item._modified">有修改未保存</span>
@@ -38,6 +39,20 @@
             <input v-model="item.title" @input="item._modified = true" :disabled="meeting.status === 'active'" />
           </div>
           <div class="member-row">
+            <div class="member-field flex-1">
+              <label>责任人</label>
+              <select v-model="item.assignee_name" @change="item._modified = true">
+                <option value="">未分配</option>
+                <option v-for="u in users" :key="u.id" :value="u.name">{{ u.name }}</option>
+              </select>
+            </div>
+            <div class="member-field flex-1">
+              <label>关注人 / Check人</label>
+              <select v-model="item.watcher_name" @change="item._modified = true">
+                <option value="">不指定</option>
+                <option v-for="u in users" :key="u.id" :value="u.name">{{ u.name }}</option>
+              </select>
+            </div>
             <div class="member-field flex-1">
               <label>截止日期</label>
               <input type="date" v-model="item.due_date" @input="item._modified = true" />
@@ -94,6 +109,7 @@ import api from '../api'
 const route = useRoute()
 const meeting = ref(null)
 const items = ref([])
+const users = ref([])
 const filterName = ref('')
 const loadError = ref('')
 
@@ -105,7 +121,9 @@ async function loadMeeting() {
   loadError.value = ''
   try {
     const { data } = await api.get(`/meetings/${route.params.id}/edit`)
+    const usersRes = await api.get('/users')
     meeting.value = data
+    users.value = usersRes.data
     items.value = data.action_items.map(item => ({
       ...item,
       checkpoints: item.checkpoints || [],
@@ -143,6 +161,7 @@ async function saveItem(item) {
       title: item.title,
       description: item.description,
       assignee_name: item.assignee_name,
+      watcher_name: item.watcher_name,
       priority: item.priority,
       due_date: item.due_date,
       checkpoints: item.checkpoints.filter(cp => cp.check_date),

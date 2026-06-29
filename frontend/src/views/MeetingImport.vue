@@ -63,6 +63,7 @@
           <input v-model="editTitle" />
         </div>
         <p class="result-count">共 {{ editItems.length }} 个行动项 → 将推送到「{{ channelName }}」供团队确认</p>
+        <button class="btn-secondary btn-small" @click="setAllWatcher('文静')">全部设为文静关注</button>
       </div>
 
       <div class="edit-actions-list">
@@ -80,6 +81,13 @@
               <label>责任人</label>
               <select v-model="item.assignee_name">
                 <option value="">未分配</option>
+                <option v-for="u in users" :key="u.id" :value="u.name">{{ u.name }}</option>
+              </select>
+            </div>
+            <div class="edit-field flex-1">
+              <label>关注人 / Check人</label>
+              <select v-model="item.watcher_name">
+                <option value="">不指定</option>
                 <option v-for="u in users" :key="u.id" :value="u.name">{{ u.name }}</option>
               </select>
             </div>
@@ -231,6 +239,7 @@ async function parseNotes() {
       title: item.title || '',
       description: item.description || '',
       assignee_name: item.assignee_name || '',
+      watcher_name: item.watcher_name || '',
       priority: item.priority || 'medium',
       due_date: item.due_date || '',
       checkpoints: (item.checkpoints || []).map(cp => ({
@@ -250,7 +259,11 @@ async function parseNotes() {
 
 function removeItem(idx) { editItems.value.splice(idx, 1) }
 function addItem() {
-  editItems.value.push({ title: '', description: '', assignee_name: '', priority: 'medium', due_date: '', checkpoints: [] })
+  editItems.value.push({ title: '', description: '', assignee_name: '', watcher_name: '', priority: 'medium', due_date: '', checkpoints: [] })
+}
+
+function setAllWatcher(name) {
+  editItems.value.forEach(item => { item.watcher_name = name })
 }
 
 async function publishDraft() {

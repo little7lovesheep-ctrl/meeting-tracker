@@ -45,6 +45,7 @@ class ActionItemOut(BaseModel):
     description: Optional[str]
     assignee_id: Optional[int]
     assignee_name: Optional[str]
+    watcher_name: Optional[str]
     status: str
     priority: str
     due_date: Optional[str]
@@ -57,6 +58,7 @@ class ActionItemUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     assignee_id: Optional[int] = None
+    watcher_name: Optional[str] = None
     status: Optional[str] = None
     priority: Optional[str] = None
     due_date: Optional[date] = None
